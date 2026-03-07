@@ -1,9 +1,6 @@
-<<<<<<< Updated upstream
-=======
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
->>>>>>> Stashed changes
 generator client {
   provider = "prisma-client"
   output   = "../.prisma/client"
@@ -15,29 +12,6 @@ datasource db {
 }
 
 model User {
-<<<<<<< Updated upstream
-  id     String @id @default(uuid())
-  name   String
-  email  String @unique
-  role   Role @default(USER)
-  createdAt DateTime @default(now())
-
-  customerPickups Pickup[] @relation("CustomerPickups")
-  agentPickups    Pickup[] @relation("AgentPickups")
-}
-
-model Pickup {
-  id           String   @id @default(uuid())
-  customerId   String
-  agentId      String?
-  pickupTime   DateTime
-  location     String
-  status       PickupStatus @default(PENDING)
-  createdAt    DateTime @default(now())
-
-  customer     User @relation("CustomerPickups", fields: [customerId], references: [id])
-  agent        User? @relation("AgentPickups", fields: [agentId], references: [id])
-=======
   id         String   @id @default(uuid())
   name       String
   email      String   @unique
@@ -121,27 +95,15 @@ model LeaderboardEntry {
   lastPickupAt  DateTime @updatedAt              // feeds formatLeaderboardDate() + timeAgo()
 
   user          User     @relation(fields: [userId], references: [id])
->>>>>>> Stashed changes
 }
 
 enum Role {
   ADMIN
   USER
-<<<<<<< Updated upstream
-  AGENT
-}
-
-enum PickupStatus {
-  PENDING
-  CONFIRMED
-  COMPLETED
-  CANCELLED
-=======
 }
 
 enum PickupStatus {
   PENDING_AGENT  // orange badge
   CONFIRMED      // green badge — token minted
   CANCELLED      // voided before confirmation
->>>>>>> Stashed changes
 }
