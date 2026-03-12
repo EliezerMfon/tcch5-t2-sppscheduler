@@ -1,6 +1,5 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../lib/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -9,27 +8,62 @@ datasource db {
 }
 
 model User {
-  id     String @id @default(uuid())
-  name   String
-  email  String @unique
-  role   Role @default(USER)
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  role      Role     @default(USER)
   createdAt DateTime @default(now())
+
+  reviews     Review[]
+  payments    Payment[]
+  attendance  Attendance[]
 
   customerPickups Pickup[] @relation("CustomerPickups")
   agentPickups    Pickup[] @relation("AgentPickups")
 }
 
-model Pickup {
-  id           String   @id @default(uuid())
-  customerId   String
-  agentId      String?
-  pickupTime   DateTime
-  location     String
-  status       PickupStatus @default(PENDING)
-  createdAt    DateTime @default(now())
+model Payment {
+  id        String   @id @default(uuid())
+  userId    String
+  amount    Float
+  reference String
+  hashProof String?
+  createdAt DateTime @default(now())
 
-  customer     User @relation("CustomerPickups", fields: [customerId], references: [id])
-  agent        User? @relation("AgentPickups", fields: [agentId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  content   String
+  rating    Int
+  hashProof String?
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Attendance {
+  id        String   @id @default(uuid())
+  userId    String
+  date      DateTime
+  hashProof String?
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Pickup {
+  id         String       @id @default(uuid())
+  customerId String
+  agentId    String?
+  pickupTime DateTime
+  location   String
+  status     PickupStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+
+  customer User  @relation("CustomerPickups", fields: [customerId], references: [id])
+  agent    User? @relation("AgentPickups", fields: [agentId], references: [id])
 }
 
 enum Role {

@@ -2,12 +2,15 @@
   "name": "web3-capstone-template",
   "version": "0.1.0",
   "private": true,
+
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
+
+
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "dotenv": "^17.3.1",
@@ -17,6 +20,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
+
   "devDependencies": {
     "@metamask/providers": "^22.1.1",
     "@types/node": "^20",
