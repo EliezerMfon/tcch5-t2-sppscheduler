@@ -1,9 +1,12 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
 generator client {
   provider = "prisma-client"
-  output   = "../.prisma/client"
+  output   = "../lib/generated/prisma"
 }
 
 datasource db {
@@ -12,98 +15,46 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  name       String
-  email      String   @unique
-  wallet     String?  @unique           // wallet used for PKU token minting
-  role       Role     @default(USER)
-  createdAt  DateTime @default(now())
-
-  reviews     Review[]
-  payments    Payment[]
-  attendance  Attendance[]
-
-  // NEW
-  pickups     Pickup[]
-  leaderboard LeaderboardEntry?
+  id     String @id @default(uuid())
+  name   String
+  email  String @unique
+  wallet String?
+  role   Role @default(USER)
+  createdAt DateTime @default(now())
+  reviews Review[]
+  payments Payment[]
+  attendance Attendance[]
 }
 
 model Payment {
-  id        String   @id @default(uuid())
-  userId    String
-  amount    Float
+  id       String @id @default(uuid())
+  userId   String
+  amount   Float
   reference String
   hashProof String?
   createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id])
+  user     User  @relation(fields: [userId], references: [id])
 }
 
 model Review {
-  id        String   @id @default(uuid())
-  content   String
-  rating    Int
+  id     String @id @default(uuid())
+  content String
+  rating  Int
   hashProof String?
-  userId    String
+  userId   String
   createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id])
+  user    User  @relation(fields: [userId], references: [id])
 }
 
 model Attendance {
-  id        String   @id @default(uuid())
-  userId    String
-  date      DateTime
-  hashProof String?
-
-  user      User     @relation(fields: [userId], references: [id])
-}
-
-model Pickup {
-  id          String       @id @default(uuid())
+  id          String  @id @default(uuid())
   userId      String
-  senderName  String
-  address     String
-  notes       String?
-  scheduledAt DateTime                           // UTC ISO from buildScheduledAtISO()
-  status      PickupStatus @default(PENDING_AGENT)
-  txHash      String?
-  createdAt   DateTime     @default(now())       // "Booked At"
-  updatedAt   DateTime     @updatedAt            // "Confirmed At" after agent confirms
-
-  user        User         @relation(fields: [userId], references: [id])
-  token       PickupToken?
-}
-
-model PickupToken {
-  id        String   @id @default(uuid())
-  pickupId  String   @unique
-  toWallet  String                               // User.wallet — mint(address to, ...)
-  amount    Int      @default(100)               // 100 PKU per pickup
-  txHash    String?
-  mintedAt  DateTime @default(now())             // shown in token mint badge
-
-  pickup    Pickup   @relation(fields: [pickupId], references: [id])
-}
-
-model LeaderboardEntry {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  walletDisplay String                           // "0xA1b2...3C4d" truncated for table
-  totalPickups  Int      @default(0)             // incremented per CONFIRMED pickup
-  totalTokens   Int      @default(0)             // += 100 per confirmed pickup
-  lastPickupAt  DateTime @updatedAt              // feeds formatLeaderboardDate() + timeAgo()
-
-  user          User     @relation(fields: [userId], references: [id])
+  date        DateTime
+  hashProof   String?
+  user      User @relation(fields: [userId], references: [id])
 }
 
 enum Role {
   ADMIN
   USER
-}
-
-enum PickupStatus {
-  PENDING_AGENT  // orange badge
-  CONFIRMED      // green badge — token minted
-  CANCELLED      // voided before confirmation
 }
