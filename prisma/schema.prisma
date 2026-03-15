@@ -1,9 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client"
-  output   = "../.prisma/client"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -12,20 +8,20 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  name       String
-  email      String   @unique
-  wallet     String?  @unique           // wallet used for PKU token minting
-  role       Role     @default(USER)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  wallet    String?  @unique
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
 
   reviews     Review[]
   payments    Payment[]
   attendance  Attendance[]
 
-  // NEW
-  pickups     Pickup[]
-  leaderboard LeaderboardEntry?
+  customerPickups  Pickup[]          @relation("CustomerPickups")
+  agentPickups     Pickup[]          @relation("AgentPickups")
+  leaderboard      LeaderboardEntry?
 }
 
 model Payment {
@@ -36,7 +32,7 @@ model Payment {
   hashProof String?
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Review {
@@ -47,7 +43,7 @@ model Review {
   userId    String
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Attendance {
@@ -56,54 +52,60 @@ model Attendance {
   date      DateTime
   hashProof String?
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Pickup {
   id          String       @id @default(uuid())
-  userId      String
-  senderName  String
-  address     String
-  notes       String?
-  scheduledAt DateTime                           // UTC ISO from buildScheduledAtISO()
-  status      PickupStatus @default(PENDING_AGENT)
+  customerId  String
+  agentId     String?
+  senderName  String                        // form field: Sender Name
+  location    String                        // form field: Pickup Address (kept as location)
+  notes       String?                       // form field: Notes
+  pickupTime  DateTime                      // scheduledAt sent from frontend → stored here
+  status      PickupStatus @default(PENDING)
   txHash      String?
-  createdAt   DateTime     @default(now())       // "Booked At"
-  updatedAt   DateTime     @updatedAt            // "Confirmed At" after agent confirms
+  createdAt   DateTime     @default(now())  // "Booked At" in confirmation card
+  updatedAt   DateTime     @updatedAt       // "Confirmed At" after agent confirms
 
-  user        User         @relation(fields: [userId], references: [id])
-  token       PickupToken?
+  customer User  @relation("CustomerPickups", fields: [customerId], references: [id])
+  agent    User? @relation("AgentPickups", fields: [agentId], references: [id])
+  token    PickupToken?
 }
 
+// One PKU token record per confirmed pickup — mirrors PickupToken.sol mint()
 model PickupToken {
-  id        String   @id @default(uuid())
-  pickupId  String   @unique
-  toWallet  String                               // User.wallet — mint(address to, ...)
-  amount    Int      @default(100)               // 100 PKU per pickup
-  txHash    String?
-  mintedAt  DateTime @default(now())             // shown in token mint badge
+  id       String   @id @default(uuid())
+  pickupId String   @unique
+  toWallet String
+  amount   Int      @default(100)           // 100 PKU per pickup
+  txHash   String?
+  mintedAt DateTime @default(now())
 
-  pickup    Pickup   @relation(fields: [pickupId], references: [id])
+  pickup Pickup @relation(fields: [pickupId], references: [id])
 }
 
+// One row per user — drives the leaderboard table
 model LeaderboardEntry {
   id            String   @id @default(uuid())
   userId        String   @unique
-  walletDisplay String                           // "0xA1b2...3C4d" truncated for table
-  totalPickups  Int      @default(0)             // incremented per CONFIRMED pickup
-  totalTokens   Int      @default(0)             // += 100 per confirmed pickup
-  lastPickupAt  DateTime @updatedAt              // feeds formatLeaderboardDate() + timeAgo()
+  walletDisplay String                       // truncated wallet e.g. "0xA1b2...3C4d"
+  totalPickups  Int      @default(0)
+  totalTokens   Int      @default(0)
+  lastPickupAt  DateTime @updatedAt          // auto-refreshes → feeds DD/MM/YYYY · timeAgo()
 
-  user          User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 enum Role {
   ADMIN
   USER
+  AGENT
 }
 
 enum PickupStatus {
-  PENDING_AGENT  // orange badge
-  CONFIRMED      // green badge — token minted
-  CANCELLED      // voided before confirmation
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
 }
