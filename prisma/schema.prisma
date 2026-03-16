@@ -11,6 +11,7 @@ model User {
   id        String   @id @default(uuid())
   name      String
   email     String   @unique
+  wallet    String?  @unique
   role      Role     @default(USER)
   createdAt DateTime @default(now())
 
@@ -18,8 +19,9 @@ model User {
   payments    Payment[]
   attendance  Attendance[]
 
-  customerPickups Pickup[] @relation("CustomerPickups")
-  agentPickups    Pickup[] @relation("AgentPickups")
+  customerPickups  Pickup[]          @relation("CustomerPickups")
+  agentPickups     Pickup[]          @relation("AgentPickups")
+  leaderboard      LeaderboardEntry?
 }
 
 model Payment {
@@ -54,16 +56,45 @@ model Attendance {
 }
 
 model Pickup {
-  id         String       @id @default(uuid())
-  customerId String
-  agentId    String?
-  pickupTime DateTime
-  location   String
-  status     PickupStatus @default(PENDING)
-  createdAt  DateTime     @default(now())
+  id          String       @id @default(uuid())
+  customerId  String
+  agentId     String?
+  senderName  String                        // form field: Sender Name
+  location    String                        // form field: Pickup Address (kept as location)
+  notes       String?                       // form field: Notes
+  pickupTime  DateTime                      // scheduledAt sent from frontend → stored here
+  status      PickupStatus @default(PENDING)
+  txHash      String?
+  createdAt   DateTime     @default(now())  // "Booked At" in confirmation card
+  updatedAt   DateTime     @updatedAt       // "Confirmed At" after agent confirms
 
   customer User  @relation("CustomerPickups", fields: [customerId], references: [id])
   agent    User? @relation("AgentPickups", fields: [agentId], references: [id])
+  token    PickupToken?
+}
+
+// One PKU token record per confirmed pickup — mirrors PickupToken.sol mint()
+model PickupToken {
+  id       String   @id @default(uuid())
+  pickupId String   @unique
+  toWallet String
+  amount   Int      @default(100)           // 100 PKU per pickup
+  txHash   String?
+  mintedAt DateTime @default(now())
+
+  pickup Pickup @relation(fields: [pickupId], references: [id])
+}
+
+// One row per user — drives the leaderboard table
+model LeaderboardEntry {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  walletDisplay String                       // truncated wallet e.g. "0xA1b2...3C4d"
+  totalPickups  Int      @default(0)
+  totalTokens   Int      @default(0)
+  lastPickupAt  DateTime @updatedAt          // auto-refreshes → feeds DD/MM/YYYY · timeAgo()
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 enum Role {
