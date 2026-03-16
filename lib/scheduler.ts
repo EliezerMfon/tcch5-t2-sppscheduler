@@ -1,41 +1,37 @@
-import { prisma } from "@/lib/prisma"
+import { PrismaClient, Role, PickupStatus } from "@prisma/client"
 
-export async function schedulePickup(data: {
-  customerId: string
+const prisma = new PrismaClient()
+
+interface PickupRequest {
+  userId: string
   pickupTime: string
-  location: string
-}) {
-  const { customerId, pickupTime, location } = data
+}
 
-  const time = new Date(pickupTime)
+export async function schedulePickup(data: PickupRequest) {
+  const { userId, pickupTime } = data
 
-  // Find agents available at that time
-  const availableAgents = await prisma.user.findMany({
+  // Find an available agent
+  const agent = await prisma.user.findFirst({
     where: {
-      role: "AGENT",
-      agentPickups: {
-        none: {
-          pickupTime: time
-        }
-      }
+      role: Role.AGENT
     }
   })
 
-  if (availableAgents.length === 0) {
-    throw new Error("No agents available at this time")
+  if (!agent) {
+    throw new Error("No available agent")
   }
-
-  const assignedAgent = availableAgents[0]
 
   const pickup = await prisma.pickup.create({
     data: {
-      customerId,
-      agentId: assignedAgent.id,
-      pickupTime: time,
-      location,
-      status: "CONFIRMED"
+      customerId: userId,
+      agentId: agent.id,
+      pickupTime: new Date(pickupTime),
+      status: PickupStatus.PENDING
     }
   })
 
-  return pickup
+  return {
+    message: "Pickup scheduled successfully",
+    pickup
+  }
 }
