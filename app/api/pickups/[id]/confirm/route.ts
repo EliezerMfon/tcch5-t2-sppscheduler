@@ -2,78 +2,69 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = params;
+  const { id } = await context.params;
 
-    // First, get the pickup to find the userId
-    const pickupData = await prisma.pickup.findUnique({
+  try {
+    const pickup = await prisma.pickup.findUnique({
       where: { id },
-      select: { userId: true },
+      include: { customer: true },
     });
 
-    if (!pickupData) {
-      return NextResponse.json(
-        { error: "Pickup not found" },
-        { status: 404 }
-      );
+    if (!pickup) {
+      return NextResponse.json({ error: `Pickup ${id} not found` }, { status: 404 });
     }
 
-    const userId = pickupData.userId;
-    const mockWallet = "0x" + Math.random().toString(16).slice(2, 40); // Mock wallet for demo
+    const walletDisplay = pickup.customer.wallet
+      ? `${pickup.customer.wallet.slice(0, 6)}...${pickup.customer.wallet.slice(-4)}`
+      : "0x????...????";
 
-    // Start transaction: confirm pickup, create token, upsert leaderboard
-    const [pickup, token, leaderboardEntry] = await prisma.$transaction([
-      // 1. Update pickup status to CONFIRMED
+    const [confirmedPickup] = await prisma.$transaction([
       prisma.pickup.update({
         where: { id },
-        data: {
-          status: "CONFIRMED",
-          updatedAt: new Date(),
-        },
+        data: { status: "CONFIRMED" },
       }),
-      // 2. Create PickupToken with wallet address
+
       prisma.pickupToken.create({
         data: {
           pickupId: id,
-          toWallet: mockWallet,
-          amount: 100,
-          txHash: "0x" + Math.random().toString(16).slice(2, 66),
+          toWallet: pickup.customer.wallet ?? "",
+          amount:   100,
         },
       }),
-      // 3. Upsert LeaderboardEntry with actual userId and wallet
+
       prisma.leaderboardEntry.upsert({
-        where: { userId },
+        where:  { userId: pickup.customerId },
+        create: {
+          userId:        pickup.customerId,
+          walletDisplay,
+          totalPickups:  1,
+          totalTokens:   100,
+        },
         update: {
           totalPickups: { increment: 1 },
-          totalTokens: { increment: 100 },
-          lastPickupAt: new Date(),
-        },
-        create: {
-          userId,
-          walletDisplay: mockWallet.slice(0, 6) + "..." + mockWallet.slice(-4),
-          totalPickups: 1,
-          totalTokens: 100,
+          totalTokens:  { increment: 100 },
         },
       }),
     ]);
 
-    return NextResponse.json(
-      {
-        pickup,
-        token,
-        leaderboardEntry,
-        message: "Pickup confirmed and token minted",
+    return NextResponse.json({
+      pickup: {
+        id:           confirmedPickup.id,
+        senderName:   confirmedPickup.senderName,
+        address:      confirmedPickup.location,
+        scheduledAt:  confirmedPickup.pickupTime.toISOString(),
+        createdAt:    confirmedPickup.createdAt.toISOString(),
+        updatedAt:    confirmedPickup.updatedAt.toISOString(),
+        status:       confirmedPickup.status,
+        txHash:       confirmedPickup.txHash ?? null,
+        tokensMinted: 100,
       },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("PATCH /api/pickups/[id]/confirm error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    });
+  } catch (error: any) {
+    console.error("[PATCH confirm error]", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

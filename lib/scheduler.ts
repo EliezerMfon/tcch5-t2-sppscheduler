@@ -4,21 +4,22 @@ export async function schedulePickup(data: {
   customerId: string
   pickupTime: string
   location: string
+  senderName: string
+  notes?: string | null
 }) {
-  const { customerId, pickupTime, location } = data
+  const { customerId, pickupTime, location, senderName, notes } = data
 
   const time = new Date(pickupTime)
 
-  // Find agents available at that time
+  if (isNaN(time.getTime())) {
+    throw new Error("Invalid pickup time provided.")
+  }
+
+  // Find any available agent (simplified — just get first AGENT user)
   const availableAgents = await prisma.user.findMany({
     where: {
       role: "AGENT",
-      agentPickups: {
-        none: {
-          pickupTime: time
-        }
-      }
-    }
+    },
   })
 
   if (availableAgents.length === 0) {
@@ -30,11 +31,13 @@ export async function schedulePickup(data: {
   const pickup = await prisma.pickup.create({
     data: {
       customerId,
-      agentId: assignedAgent.id,
-      pickupTime: time,
+      agentId:    assignedAgent.id,
+      senderName,
       location,
-      status: "CONFIRMED"
-    }
+      notes:      notes ?? null,
+      pickupTime: time,
+      status:     "PENDING",
+    },
   })
 
   return pickup

@@ -73,11 +73,15 @@ function timeAgo(iso: string | null | undefined): string {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
 }
-
 function buildScheduledAtISO(dateStr: string, timeSlot: string): string {
+  if (!dateStr || !timeSlot) return "";
+  // dateStr from <input type="date"> is always YYYY-MM-DD
   const [y, mo, d] = dateStr.split("-").map(Number);
-  const [h, mi]    = timeSlot.split(":").map(Number);
-  return new Date(y, mo - 1, d, h, mi, 0, 0).toISOString();
+  const [h, mi] = timeSlot.split(":").map(Number);
+  if (!y || !mo || !d || isNaN(h) || isNaN(mi)) return "";
+  const dt = new Date(y, mo - 1, d, h, mi, 0, 0);
+  if (isNaN(dt.getTime())) return "";
+  return dt.toISOString();
 }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -309,33 +313,38 @@ export default function PickupScheduler({ initialLeaderboard, stats }: PickupSch
   // POST to /api/users/pickup (your existing route)
   // Sends field names the API route expects after our fix
   const handleBook = async () => {
-    if (!form.sender || !form.address || !form.date || !selectedTime) return;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/users/pickup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId:      DEMO_USER_ID,          // → customerId in Prisma
-          senderName:  form.sender,
-          address:     form.address,          // → location in Prisma
-          notes:       form.notes || null,
-          scheduledAt: buildScheduledAtISO(form.date, selectedTime), // → pickupTime in Prisma
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
+  if (!form.sender || !form.address || !form.date || !selectedTime) return;
+  
+  const scheduledAt = buildScheduledAtISO(form.date, selectedTime);
+  if (!scheduledAt) {
+    alert("Invalid date or time selected. Please try again.");
+    return;
+  }
 
-      // Response is remapped by the API: location→address, pickupTime→scheduledAt
-      const pickup: ConfirmedPickup = await res.json();
-      setConfirmed(pickup);
-      setPending(pickup);
-    } catch (err) {
-      console.error("Booking failed:", err);
-      alert("Failed to schedule pickup. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const res = await fetch("/api/users/pickup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId:     DEMO_USER_ID,
+        senderName: form.sender,
+        address:    form.address,
+        notes:      form.notes || null,
+        scheduledAt,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const pickup: ConfirmedPickup = await res.json();
+    setConfirmed(pickup);
+    setPending(pickup);
+  } catch (err) {
+    console.error("Booking failed:", err);
+    alert("Failed to schedule pickup. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ── Agent confirm ────────────────────────────────────────────────────────────
   // PATCH /api/pickups/[id]/confirm
